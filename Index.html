@@ -1,0 +1,1370 @@
+<html><head><base href="/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Music Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    :root {
+      --primary: #2a2a72;
+      --secondary: #009ffd;
+      --accent: #ff6b6b;
+      --background: #1a1a2e;
+      --text: #ffffff;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Arial', sans-serif;
+      background: var(--background);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--secondary);
+      font-size: 2.5em;
+      margin-bottom: 40px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .control-group {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--secondary);
+    }
+
+    select, input[type="range"] {
+      width: 100%;
+      padding: 10px;
+      background: var(--primary);
+      color: var(--text);
+      border: none;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    button {
+      padding: 15px 30px;
+      border: none;
+      border-radius: 25px;
+      background: var(--secondary);
+      color: var(--text);
+      font-size: 1.1em;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      background: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .visualizer {
+      width: 100%;
+      height: 200px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      margin: 20px 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .wave {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .bar {
+      flex: 1;
+      background: var(--secondary);
+      margin: 0 1px;
+      transition: height 0.1s;
+    }
+
+    .loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .loading.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid var(--secondary);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .instrument-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .instrument-item {
+      display: flex;
+      gap: 10px;
+    }
+
+    .instrument-select {
+      flex: 1;
+    }
+
+    #addInstrument {
+      margin-top: 10px;
+      width: 100%;
+    }
+
+    .remove-instrument {
+      padding: 5px 10px;
+    }
+
+    .melody-controls {
+      display: grid;
+      gap: 15px;
+    }
+
+    .melody-controls > div {
+      display: grid;
+      gap: 5px;
+    }
+
+    .melody-controls label {
+      font-size: 0.9em;
+      margin-bottom: 5px;
+    }
+
+    .melody-controls select {
+      width: 100%;
+    }
+
+    .time-signature {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .time-signature select {
+      width: 70px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--primary);
+      transition: .4s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--secondary);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    
+    .drum-controls {
+      display: grid;
+      gap: 15px;
+    }
+
+    .drum-controls > div {
+      display: grid;
+      gap: 5px;
+    }
+
+    #drumGrid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 5px;
+      margin: 20px 0;
+    }
+
+    .drum-cell {
+      width: 30px;
+      height: 30px;
+      background: var(--primary);
+      border: 1px solid var(--secondary);
+      cursor: pointer;
+    }
+
+    .drum-cell.active {
+      background: var(--secondary);
+    }
+
+    .note-cell {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      border: 1px solid var(--secondary);
+      cursor: pointer;
+      margin: 3px;
+      display: inline-block;
+      text-align: center;
+      line-height: 40px;
+      color: var(--text);
+    }
+
+    .note-cell.active {
+      background: var(--secondary);
+    }
+
+    #noteGrid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      margin: 20px 0;
+    }
+
+    .voice-controls {
+      display: grid;
+      gap: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AI Music Generator</h1>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="genre">Genre</label>
+        <select id="genre">
+          <option value="electronic">Electronic</option>
+          <option value="ambient">Ambient</option> 
+          <option value="jazz">Jazz</option>
+          <option value="classical">Classical</option>
+          <option value="rock">Rock</option>
+          <option value="metal">Metal</option>
+          <option value="folk">Folk</option>
+          <option value="funk">Funk</option>
+          <option value="reggae">Reggae</option>
+          <option value="pop">Pop</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Instruments</label>
+        <div class="instrument-list">
+          <div class="instrument-item">
+            <select class="instrument-select">
+              <option value="synth">Synth</option>
+              <option value="piano">Piano</option>
+              <option value="bass">Bass</option>
+              <option value="strings">Strings</option>
+              <option value="marimba">Marimba</option>
+              <option value="guitar">Guitar</option>
+              <option value="drums">Drums</option>
+              <option value="trumpet">Trumpet</option>
+              <option value="flute">Flute</option>
+              <option value="organ">Organ</option>
+              <option value="choir">Choir</option>
+              <option value="kalimba">Kalimba</option>
+            </select>
+            <button class="remove-instrument" disabled>Remove</button>
+          </div>
+        </div>
+        <button id="addInstrument">Add Instrument</button>
+      </div>
+
+      <div class="control-group">
+        <label for="tempo">Tempo (BPM)</label>
+        <input type="range" id="tempo" min="60" max="180" value="120">
+        <span id="tempoValue">120 BPM</span>
+      </div>
+
+      <div class="control-group">
+        <label for="complexity">Complexity</label>
+        <input type="range" id="complexity" min="1" max="10" value="5">
+        <span id="complexityValue">5</span>
+      </div>
+
+      <div class="control-group">
+        <label>Time Signature</label>
+        <div class="time-signature">
+          <select id="timeSignatureTop">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+          </select>
+          <span>/</span>
+          <select id="timeSignatureBottom">
+            <option value="4" selected>4</option>
+            <option value="8">8</option>
+            <option value="16">16</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Background Drums</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="drumToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="control-group" id="drumSettingsGroup" style="display: none;">
+        <label>Drum Settings</label>
+        <div class="drum-controls">
+          <div>
+            <label for="drumComplexity">Drum Complexity</label>
+            <input type="range" id="drumComplexity" min="1" max="10" value="5">
+            <span id="drumComplexityValue">5</span>
+          </div>
+          
+          <div>
+            <label for="kickVolume">Kick Volume</label>  
+            <input type="range" id="kickVolume" min="0" max="100" value="75">
+            <span id="kickVolumeValue">75</span>
+          </div>
+
+          <div>
+            <label for="snareVolume">Snare Volume</label>
+            <input type="range" id="snareVolume" min="0" max="100" value="75"> 
+            <span id="snareVolumeValue">75</span>
+          </div>
+
+          <div>
+            <label for="hihatVolume">Hi-Hat Volume</label>
+            <input type="range" id="hihatVolume" min="0" max="100" value="75">
+            <span id="hihatVolumeValue">75</span>
+          </div>
+
+          <div>
+            <label for="drumPattern">Drum Pattern</label>
+            <select id="drumPattern">
+              <option value="basic">Basic</option>
+              <option value="complex">Complex</option>
+              <option value="syncopated">Syncopated</option>
+              <option value="random">Random</option>
+            </select>
+          </div>
+
+          <button id="customizeDrums">Customize Pattern</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Melody Settings</label>
+        <div class="melody-controls">
+          <div>
+            <label for="melodicRange">Melodic Range</label>
+            <input type="range" id="melodicRange" min="1" max="24" value="12">
+            <span id="melodicRangeValue">12 semitones</span>
+          </div>
+          
+          <div>
+            <label for="melodicDirection">Melodic Direction</label>
+            <select id="melodicDirection">
+              <option value="any">Any Direction</option>
+              <option value="ascending">Ascending</option>
+              <option value="descending">Descending</option>
+              <option value="wave">Wave-like</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="noteLength">Note Length Variation</label>
+            <input type="range" id="noteLength" min="1" max="10" value="5">
+            <span id="noteLengthValue">5</span>
+          </div>
+
+          <div>
+            <label for="melodicDensity">Melodic Density</label>
+            <input type="range" id="melodicDensity" min="1" max="10" value="5">
+            <span id="melodicDensityValue">5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Voice Harmony</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="voiceToggle"> 
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="control-group" id="voiceSettingsGroup" style="display:none;">
+        <label>Voice Settings</label>
+        <div class="voice-controls">
+          <div>
+            <label for="voiceType">Voice Type</label>
+            <select id="voiceType">
+              <option value="soprano">Soprano</option>
+              <option value="alto">Alto</option>
+              <option value="tenor">Tenor</option>
+              <option value="bass">Bass</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="harmonization">Harmonization</label>
+            <select id="harmonization">
+              <option value="unison">Unison</option>
+              <option value="third">Third Above</option>
+              <option value="fifth">Fifth Above</option>
+              <option value="octave">Octave</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="vibrato">Vibrato Amount</label>
+            <input type="range" id="vibrato" min="0" max="100" value="20">
+            <span id="vibratoValue">20</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="distortion">Distortion</label>
+        <input type="range" id="distortion" min="0" max="100" value="0">
+        <span id="distortionValue">0</span>
+      </div>
+
+      <div class="control-group">
+        <label for="reverb">Reverb</label>
+        <input type="range" id="reverb" min="0" max="100" value="20">
+        <span id="reverbValue">20</span>
+      </div>
+
+      <div class="control-group">
+        <label for="delay">Delay</label>
+        <input type="range" id="delay" min="0" max="100" value="0">
+        <span id="delayValue">0</span>
+      </div>
+    </div>
+
+    <button id="chooseNotes">Choose Core Notes</button>
+
+    <div class="button-group">
+      <button id="generateBtn">Generate Music</button>
+      <button id="playBtn" disabled>Play</button>
+      <button id="stopBtn" disabled>Stop</button>
+      <button id="exportBtn" disabled>Export</button>
+    </div>
+
+    <div class="visualizer">
+      <div class="wave" id="wave"></div>
+    </div>
+  </div>
+
+  <div id="drumPatternModal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--background); padding:20px; border-radius:10px; z-index:2000;">
+    <h3>Customize Drum Pattern</h3>
+    <div id="drumGrid"></div>
+    <div class="button-group">
+      <button id="saveDrumPattern">Save Pattern</button>
+      <button id="cancelDrumPattern">Cancel</button>
+    </div>
+  </div>
+
+  <div id="notePickerModal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); 
+    background:var(--background); padding:20px; border-radius:10px; z-index:2000;">
+    <h3>Choose Core Notes</h3>
+    <div id="noteGrid"></div>
+    <div class="button-group">
+      <button id="saveNotes">Save Notes</button>
+      <button id="cancelNotes">Cancel</button>
+    </div>
+  </div>
+
+  <div class="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <script>class MusicGenerator {
+  constructor() {
+    this.instruments = [{
+      synth: new Tone.PolySynth().toDestination(),
+      pattern: null,
+      notes: [],
+      effects: {
+        distortion: new Tone.Distortion(0).toDestination(),
+        reverb: new Tone.Reverb(1.5).toDestination(),
+        delay: new Tone.FeedbackDelay("8n", 0).toDestination()
+      },
+      isVoice: false
+    }];
+    this.isPlaying = false;
+    this.recorder = null;
+    this.chunks = [];
+    this.melodySettings = {
+      range: 12,
+      direction: 'any',
+      noteLength: 5,
+      density: 5
+    };
+    this.drumPattern = null;
+    this.drumEnabled = false;
+    this.drumSettings = {
+      complexity: 5,
+      kickVolume: 0.75,
+      snareVolume: 0.75,
+      hihatVolume: 0.75,
+      pattern: 'basic',
+      customPattern: null
+    };
+    this.timeSignature = {
+      top: 4,
+      bottom: 4
+    };
+    this.voiceEnabled = false;
+    this.voiceSettings = {
+      type: 'soprano',
+      harmonization: 'unison',
+      vibrato: 20
+    };
+    this.coreNotes = null;
+    this.setupVisualizer();
+    this.setupControls();
+    this.setupEffects();
+  }
+  setupVisualizer() {
+    const wave = document.getElementById('wave');
+    const bars = 32;
+    for (let i = 0; i < bars; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      wave.appendChild(bar);
+    }
+  }
+  setupControls() {
+    document.getElementById('tempo').addEventListener('input', e => {
+      const tempo = e.target.value;
+      document.getElementById('tempoValue').textContent = `${tempo} BPM`;
+      if (Tone.Transport.state === "started") {
+        Tone.Transport.bpm.value = tempo;
+      }
+    });
+    document.getElementById('complexity').addEventListener('input', e => {
+      document.getElementById('complexityValue').textContent = e.target.value;
+      if (this.isPlaying) {
+        this.generateMusic();
+      }
+    });
+    document.getElementById('generateBtn').addEventListener('click', () => this.generateMusic());
+    document.getElementById('playBtn').addEventListener('click', () => this.togglePlay());
+    document.getElementById('stopBtn').addEventListener('click', () => this.stop());
+    document.getElementById('exportBtn').addEventListener('click', () => this.export());
+    document.getElementById('addInstrument').addEventListener('click', () => {
+      this.addInstrument();
+    });
+    document.querySelector('.instrument-list').addEventListener('change', e => {
+      if (e.target.classList.contains('instrument-select')) {
+        const index = Array.from(document.querySelectorAll('.instrument-select')).indexOf(e.target);
+        this.updateInstrument(index, e.target.value);
+      }
+    });
+    document.querySelector('.instrument-list').addEventListener('click', e => {
+      if (e.target.classList.contains('remove-instrument')) {
+        const index = Array.from(document.querySelectorAll('.remove-instrument')).indexOf(e.target);
+        this.removeInstrument(index);
+      }
+    });
+    document.getElementById('distortion').addEventListener('input', e => {
+      document.getElementById('distortionValue').textContent = e.target.value;
+      this.instruments.forEach(inst => {
+        if (inst.effects.distortion) {
+          inst.effects.distortion.distortion = e.target.value / 100;
+        }
+      });
+    });
+    document.getElementById('reverb').addEventListener('input', e => {
+      document.getElementById('reverbValue').textContent = e.target.value;
+      this.instruments.forEach(inst => {
+        if (inst.effects.reverb) {
+          inst.effects.reverb.decay = e.target.value / 100 * 10;
+        }
+      });
+    });
+    document.getElementById('delay').addEventListener('input', e => {
+      document.getElementById('delayValue').textContent = e.target.value;
+      this.instruments.forEach(inst => {
+        if (inst.effects.delay) {
+          inst.effects.delay.feedback.value = e.target.value / 100;
+        }
+      });
+    });
+    document.getElementById('melodicRange').addEventListener('input', e => {
+      const value = e.target.value;
+      this.melodySettings.range = parseInt(value);
+      document.getElementById('melodicRangeValue').textContent = `${value} semitones`;
+    });
+    document.getElementById('melodicDirection').addEventListener('change', e => {
+      this.melodySettings.direction = e.target.value;
+    });
+    document.getElementById('noteLength').addEventListener('input', e => {
+      const value = e.target.value;
+      this.melodySettings.noteLength = parseInt(value);
+      document.getElementById('noteLengthValue').textContent = value;
+    });
+    document.getElementById('melodicDensity').addEventListener('input', e => {
+      const value = e.target.value;
+      this.melodySettings.density = parseInt(value);
+      document.getElementById('melodicDensityValue').textContent = value;
+    });
+    document.getElementById('timeSignatureTop').addEventListener('change', e => {
+      this.timeSignature.top = parseInt(e.target.value);
+      Tone.Transport.timeSignature = [this.timeSignature.top, this.timeSignature.bottom];
+      if (this.isPlaying) {
+        this.generateMusic();
+      }
+    });
+    document.getElementById('timeSignatureBottom').addEventListener('change', e => {
+      this.timeSignature.bottom = parseInt(e.target.value);
+      Tone.Transport.timeSignature = [this.timeSignature.top, this.timeSignature.bottom];
+      if (this.isPlaying) {
+        this.generateMusic();
+      }
+    });
+    document.getElementById('drumToggle').addEventListener('change', e => {
+      this.drumEnabled = e.target.checked;
+      document.getElementById('drumSettingsGroup').style.display = this.drumEnabled ? 'block' : 'none';
+      if (this.isPlaying) {
+        if (this.drumEnabled) {
+          this.generateDrumPattern();
+          this.drumPattern.start(0);
+        } else if (this.drumPattern) {
+          this.drumPattern.stop();
+        }
+      }
+    });
+    document.getElementById('drumComplexity').addEventListener('input', e => {
+      this.drumSettings.complexity = parseInt(e.target.value);
+      document.getElementById('drumComplexityValue').textContent = e.target.value;
+      if (this.isPlaying && this.drumEnabled) {
+        this.generateDrumPattern();
+        this.drumPattern.start(0);
+      }
+    });
+    ['kick', 'snare', 'hihat'].forEach(drum => {
+      document.getElementById(`${drum}Volume`).addEventListener('input', e => {
+        this.drumSettings[`${drum}Volume`] = e.target.value / 100;
+        document.getElementById(`${drum}VolumeValue`).textContent = e.target.value;
+      });
+    });
+    document.getElementById('drumPattern').addEventListener('change', e => {
+      this.drumSettings.pattern = e.target.value;
+      if (this.isPlaying && this.drumEnabled) {
+        this.generateDrumPattern();
+        this.drumPattern.start(0);
+      }
+    });
+    document.getElementById('customizeDrums').addEventListener('click', () => {
+      this.showDrumPatternModal();
+    });
+    document.getElementById('voiceToggle').addEventListener('change', e => {
+      this.voiceEnabled = e.target.checked;
+      document.getElementById('voiceSettingsGroup').style.display = this.voiceEnabled ? 'block' : 'none';
+    });
+    document.getElementById('voiceType').addEventListener('change', e => {
+      this.voiceSettings.type = e.target.value;
+      if (this.isPlaying) this.generateMusic();
+    });
+    document.getElementById('harmonization').addEventListener('change', e => {
+      this.voiceSettings.harmonization = e.target.value;
+      if (this.isPlaying) this.generateMusic();
+    });
+    document.getElementById('vibrato').addEventListener('input', e => {
+      this.voiceSettings.vibrato = parseInt(e.target.value);
+      document.getElementById('vibratoValue').textContent = e.target.value;
+      if (this.isPlaying) this.generateMusic();
+    });
+    document.getElementById('chooseNotes').addEventListener('click', () => {
+      this.showNotePickerModal();
+    });
+  }
+  setupEffects() {}
+  addInstrument() {
+    if (this.instruments.length >= 4) return;
+    const instrumentDiv = document.createElement('div');
+    instrumentDiv.className = 'instrument-item';
+    instrumentDiv.innerHTML = `
+          <select class="instrument-select">
+            <option value="synth">Synth</option>
+            <option value="piano">Piano</option>
+            <option value="bass">Bass</option>
+            <option value="strings">Strings</option>
+            <option value="marimba">Marimba</option>
+            <option value="guitar">Guitar</option>
+            <option value="drums">Drums</option>
+            <option value="trumpet">Trumpet</option>
+            <option value="flute">Flute</option>
+            <option value="organ">Organ</option>
+            <option value="choir">Choir</option>
+            <option value="kalimba">Kalimba</option>
+          </select>
+          <button class="remove-instrument">Remove</button>
+        `;
+    document.querySelector('.instrument-list').appendChild(instrumentDiv);
+    this.instruments.push({
+      synth: new Tone.PolySynth().toDestination(),
+      pattern: null,
+      notes: [],
+      effects: {
+        distortion: new Tone.Distortion(0).toDestination(),
+        reverb: new Tone.Reverb(1.5).toDestination(),
+        delay: new Tone.FeedbackDelay("8n", 0).toDestination()
+      },
+      isVoice: false
+    });
+    const removeButtons = document.querySelectorAll('.remove-instrument');
+    removeButtons.forEach(btn => btn.disabled = this.instruments.length <= 1);
+  }
+  removeInstrument(index) {
+    if (this.instruments.length <= 1) return;
+    if (this.instruments[index].pattern) {
+      this.instruments[index].pattern.dispose();
+    }
+    if (this.instruments[index].effects) {
+      Object.values(this.instruments[index].effects).forEach(effect => {
+        effect.dispose();
+      });
+    }
+    this.instruments[index].synth.dispose();
+    this.instruments.splice(index, 1);
+    const instrumentItems = document.querySelectorAll('.instrument-item');
+    instrumentItems[index].remove();
+    const removeButtons = document.querySelectorAll('.remove-instrument');
+    removeButtons.forEach(btn => btn.disabled = this.instruments.length <= 1);
+  }
+  updateInstrument(index, type) {
+    if (this.instruments[index].pattern) {
+      this.instruments[index].pattern.dispose();
+    }
+    this.instruments[index].synth.dispose();
+    switch (type) {
+      case 'piano':
+        this.instruments[index].synth = new Tone.Sampler({
+          urls: {
+            C4: "https://tonejs.github.io/audio/salamander/C4.mp3"
+          }
+        }).toDestination();
+        break;
+      case 'bass':
+        this.instruments[index].synth = new Tone.MonoSynth({
+          oscillator: {
+            type: "square"
+          },
+          envelope: {
+            attack: 0.1,
+            decay: 0.3,
+            sustain: 0.4,
+            release: 0.8
+          }
+        }).toDestination();
+        break;
+      case 'strings':
+        this.instruments[index].synth = new Tone.FMSynth({
+          harmonicity: 3.01,
+          modulationIndex: 14
+        }).toDestination();
+        break;
+      case 'marimba':
+        this.instruments[index].synth = new Tone.MetalSynth().toDestination();
+        break;
+      case 'guitar':
+        const guitar = new Tone.MonoSynth({
+          oscillator: {
+            type: "square"
+          },
+          envelope: {
+            attack: 0.01,
+            decay: 0.1,
+            sustain: 0.3,
+            release: 0.1
+          }
+        });
+        const distortion = new Tone.Distortion(0);
+        const reverb = new Tone.Reverb(1.5);
+        const delay = new Tone.FeedbackDelay("8n", 0);
+        guitar.chain(distortion, reverb, delay, Tone.Destination);
+        this.instruments[index] = {
+          synth: guitar,
+          pattern: null,
+          notes: this.instruments[index].notes,
+          effects: {
+            distortion,
+            reverb,
+            delay
+          },
+          isVoice: false
+        };
+        break;
+      case 'drums':
+        this.instruments[index].synth = new Tone.MembraneSynth({
+          pitchDecay: 0.05,
+          octaves: 10,
+          oscillator: {
+            type: 'sine'
+          },
+          envelope: {
+            attack: 0.001,
+            decay: 0.4,
+            sustain: 0.01,
+            release: 1.4
+          }
+        }).toDestination();
+        break;
+      case 'trumpet':
+        this.instruments[index].synth = new Tone.Synth({
+          oscillator: {
+            type: 'square'
+          },
+          envelope: {
+            attack: 0.1,
+            decay: 0.1,
+            sustain: 0.5,
+            release: 0.1
+          }
+        }).toDestination();
+        break;
+      case 'flute':
+        this.instruments[index].synth = new Tone.Synth({
+          oscillator: {
+            type: 'sine'
+          },
+          envelope: {
+            attack: 0.1,
+            decay: 0.2,
+            sustain: 0.8,
+            release: 0.1
+          }
+        }).toDestination();
+        break;
+      case 'organ':
+        this.instruments[index].synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: {
+            type: 'sine'
+          },
+          envelope: {
+            attack: 0.3,
+            decay: 0.1,
+            sustain: 1,
+            release: 0.3
+          }
+        }).toDestination();
+        break;
+      case 'choir':
+        this.instruments[index].synth = new Tone.Synth({
+          oscillator: {
+            type: 'sine'
+          },
+          envelope: {
+            attack: 0.3,
+            decay: 0.3,
+            sustain: 1,
+            release: 0.7
+          }
+        }).toDestination();
+        break;
+      case 'kalimba':
+        this.instruments[index].synth = new Tone.MetalSynth({
+          frequency: 200,
+          envelope: {
+            attack: 0.001,
+            decay: 1.4,
+            release: 0.2
+          },
+          harmonicity: 5.1,
+          modulationIndex: 32,
+          resonance: 4000,
+          octaves: 1.5
+        }).toDestination();
+        break;
+      default:
+        this.instruments[index].synth = new Tone.PolySynth().toDestination();
+    }
+  }
+  generateRhythm(complexity) {
+    const rhythms = ['4n', '8n', '16n', '4n.', '8n.', '2n'];
+    const notesCount = Math.max(4, Math.floor(complexity * this.melodySettings.density));
+    let pattern = [];
+    const rhythmVariation = this.melodySettings.noteLength / 10;
+    for (let i = 0; i < notesCount; i++) {
+      const availableRhythms = rhythms.slice(0, Math.ceil(rhythms.length * rhythmVariation));
+      const rhythm = availableRhythms[Math.floor(Math.random() * availableRhythms.length)];
+      pattern.push(rhythm);
+    }
+    return pattern;
+  }
+  generateDrumPattern() {
+    if (this.drumPattern) {
+      this.drumPattern.dispose();
+    }
+    const kick = new Tone.MembraneSynth({
+      pitchDecay: 0.05,
+      octaves: 10,
+      oscillator: {
+        type: 'sine'
+      },
+      envelope: {
+        attack: 0.001,
+        decay: 0.4,
+        sustain: 0.01,
+        release: 1.4
+      }
+    }).toDestination();
+    kick.volume.value = Tone.gainToDb(this.drumSettings.kickVolume);
+    const snare = new Tone.NoiseSynth({
+      noise: {
+        type: 'white'
+      },
+      envelope: {
+        attack: 0.001,
+        decay: 0.2,
+        sustain: 0
+      }
+    }).toDestination();
+    snare.volume.value = Tone.gainToDb(this.drumSettings.snareVolume);
+    const hihat = new Tone.MetalSynth({
+      frequency: 200,
+      envelope: {
+        attack: 0.001,
+        decay: 0.1,
+        release: 0.01
+      },
+      harmonicity: 5.1,
+      modulationIndex: 32,
+      resonance: 4000,
+      octaves: 1.5
+    }).toDestination();
+    hihat.volume.value = Tone.gainToDb(this.drumSettings.hihatVolume);
+    let pattern;
+    if (this.drumSettings.customPattern) {
+      const beats = 8;
+      pattern = Array(beats).fill().map((_, i) => {
+        const kick = this.drumSettings.customPattern[i];
+        const snare = this.drumSettings.customPattern[i + beats];
+        const hihat = this.drumSettings.customPattern[i + beats * 2];
+        return [kick ? 'C1' : null, snare ? 'snare' : null, hihat ? 'hihat' : null];
+      });
+    } else {
+      switch (this.drumSettings.pattern) {
+        case 'basic':
+          pattern = this.getBasicPattern();
+          break;
+        case 'complex':
+          pattern = this.getComplexPattern();
+          break;
+        case 'syncopated':
+          pattern = this.getSyncopatedPattern();
+          break;
+        case 'random':
+          pattern = this.getRandomPattern();
+          break;
+        default:
+          pattern = this.getBasicPattern();
+      }
+    }
+    this.drumPattern = new Tone.Sequence((time, beat) => {
+      if (!beat) return;
+      if (beat[0]) kick.triggerAttackRelease('C1', '8n', time);
+      if (beat[1]) snare.triggerAttackRelease('16n', time);
+      if (beat[2]) hihat.triggerAttackRelease('32n', time);
+    }, pattern, `${this.timeSignature.bottom}n`);
+  }
+  getBasicPattern() {
+    return [['C1', null, 'hihat'], [null, null, 'hihat'], [null, 'snare', 'hihat'], [null, null, 'hihat'], ['C1', null, 'hihat'], [null, null, 'hihat'], [null, 'snare', 'hihat'], [null, null, 'hihat']];
+  }
+  getComplexPattern() {
+    const complexity = this.drumSettings.complexity;
+    const pattern = this.getBasicPattern();
+    for (let i = 0; i < pattern.length; i++) {
+      if (Math.random() < complexity / 20) pattern[i][0] = 'C1';
+      if (Math.random() < complexity / 20) pattern[i][1] = 'snare';
+      if (Math.random() < complexity / 10) pattern[i][2] = 'hihat';
+    }
+    return pattern;
+  }
+  getSyncopatedPattern() {
+    return [['C1', null, 'hihat'], [null, 'snare', null], ['C1', null, 'hihat'], [null, null, 'hihat'], [null, 'snare', null], ['C1', null, 'hihat'], [null, 'snare', 'hihat'], ['C1', null, null]];
+  }
+  getRandomPattern() {
+    const pattern = [];
+    for (let i = 0; i < 8; i++) {
+      pattern.push([Math.random() < 0.4 ? 'C1' : null, Math.random() < 0.3 ? 'snare' : null, Math.random() < 0.5 ? 'hihat' : null]);
+    }
+    return pattern;
+  }
+  showDrumPatternModal() {
+    const modal = document.getElementById('drumPatternModal');
+    const grid = document.getElementById('drumGrid');
+    grid.innerHTML = '';
+    const instruments = ['Kick', 'Snare', 'Hi-hat'];
+    const beats = 8;
+    for (let i = 0; i < instruments.length * beats; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'drum-cell';
+      if (this.drumSettings.customPattern && this.drumSettings.customPattern[i]) {
+        cell.classList.add('active');
+      }
+      cell.addEventListener('click', () => {
+        cell.classList.toggle('active');
+      });
+      grid.appendChild(cell);
+    }
+    modal.style.display = 'block';
+    document.getElementById('saveDrumPattern').onclick = () => {
+      const cells = document.querySelectorAll('.drum-cell');
+      this.drumSettings.customPattern = Array.from(cells).map(cell => cell.classList.contains('active'));
+      modal.style.display = 'none';
+      if (this.isPlaying && this.drumEnabled) {
+        this.generateDrumPattern();
+        this.drumPattern.start(0);
+      }
+    };
+    document.getElementById('cancelDrumPattern').onclick = () => {
+      modal.style.display = 'none';
+    };
+  }
+  showNotePickerModal() {
+    const modal = document.getElementById('notePickerModal');
+    const grid = document.getElementById('noteGrid');
+    grid.innerHTML = '';
+    const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    notes.forEach(note => {
+      const cell = document.createElement('div');
+      cell.className = 'note-cell';
+      cell.textContent = note;
+      if (this.coreNotes && this.coreNotes.includes(note)) {
+        cell.classList.add('active');
+      }
+      cell.addEventListener('click', () => {
+        cell.classList.toggle('active');
+      });
+      grid.appendChild(cell);
+    });
+    modal.style.display = 'block';
+    document.getElementById('saveNotes').onclick = () => {
+      const cells = document.querySelectorAll('.note-cell');
+      this.coreNotes = Array.from(cells).filter(cell => cell.classList.contains('active')).map(cell => cell.textContent);
+      modal.style.display = 'none';
+      if (this.isPlaying) this.generateMusic();
+    };
+    document.getElementById('cancelNotes').onclick = () => {
+      modal.style.display = 'none';
+    };
+  }
+  async generateMusic() {
+    const loading = document.querySelector('.loading');
+    loading.classList.add('active');
+    try {
+      const genre = document.getElementById('genre').value;
+      const complexity = parseInt(document.getElementById('complexity').value);
+      const tempo = parseInt(document.getElementById('tempo').value);
+      Tone.Transport.bpm.value = tempo;
+      if (this.isPlaying) {
+        this.instruments.forEach(inst => {
+          if (inst.pattern) inst.pattern.stop();
+        });
+        if (this.drumPattern) this.drumPattern.stop();
+      }
+      this.instruments = this.instruments.filter(inst => !inst.isVoice);
+      for (let i = 0; i < this.instruments.length; i++) {
+        const rhythms = this.generateRhythm(complexity);
+        this.instruments[i].notes = await this.getAINotes(genre, complexity);
+        if (this.instruments[i].pattern) {
+          this.instruments[i].pattern.dispose();
+        }
+        let noteIndex = 0;
+        this.instruments[i].pattern = new Tone.Sequence((time, rhythm) => {
+          const note = this.instruments[i].notes[noteIndex % this.instruments[i].notes.length];
+          this.instruments[i].synth.triggerAttackRelease(note, rhythm, time);
+          this.updateVisualizer();
+          noteIndex++;
+        }, rhythms, '4n');
+      }
+      if (this.drumEnabled) {
+        this.generateDrumPattern();
+        if (this.isPlaying) {
+          this.drumPattern.start(0);
+        }
+      }
+      if (this.voiceEnabled) {
+        const voiceSynth = new Tone.Synth({
+          oscillator: {
+            type: 'sine'
+          },
+          envelope: {
+            attack: 0.1,
+            decay: 0.2,
+            sustain: 1,
+            release: 0.8
+          },
+          portamento: this.voiceSettings.vibrato / 500
+        }).connect(new Tone.Volume(-6)).toDestination();
+        const baseFrequencies = {
+          soprano: 'C5',
+          alto: 'G4',
+          tenor: 'C4',
+          bass: 'C3'
+        };
+        voiceSynth.frequency.value = Tone.Frequency(baseFrequencies[this.voiceSettings.type]).toFrequency();
+        const voiceInstrument = {
+          synth: voiceSynth,
+          pattern: null,
+          notes: await this.getAINotes(genre, complexity),
+          effects: {
+            distortion: new Tone.Distortion(0).toDestination(),
+            reverb: new Tone.Reverb(2.5).toDestination(),
+            delay: new Tone.FeedbackDelay("8n", 0).toDestination()
+          },
+          isVoice: true
+        };
+        voiceSynth.chain(voiceInstrument.effects.distortion, voiceInstrument.effects.reverb, voiceInstrument.effects.delay, Tone.Destination);
+        const rhythms = this.generateRhythm(Math.max(2, complexity - 1));
+        let noteIndex = 0;
+        voiceInstrument.pattern = new Tone.Sequence((time, rhythm) => {
+          const note = voiceInstrument.notes[noteIndex % voiceInstrument.notes.length];
+          if (note) {
+            voiceInstrument.synth.triggerAttackRelease(note, rhythm, time);
+          }
+          noteIndex++;
+        }, rhythms, '4n');
+        this.instruments.push(voiceInstrument);
+      }
+      if (this.isPlaying) {
+        this.instruments.forEach(inst => {
+          if (inst.pattern) inst.pattern.start(0);
+        });
+      }
+      document.getElementById('playBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = false;
+      document.getElementById('exportBtn').disabled = false;
+    } catch (error) {
+      console.error('Error generating music:', error);
+    } finally {
+      loading.classList.remove('active');
+    }
+  }
+  async getAINotes(genre, complexity) {
+    const scales = {
+      electronic: ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'],
+      ambient: ['F4', 'G4', 'A4', 'Bb4', 'C5', 'D5', 'E5', 'F5'],
+      jazz: ['D4', 'F4', 'A4', 'C5', 'E5', 'G5', 'B5', 'D6'],
+      classical: ['G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F#5', 'G5'],
+      rock: ['E4', 'G4', 'A4', 'B4', 'D5', 'E5', 'G5', 'A5'],
+      metal: ['E3', 'G3', 'A3', 'C4', 'D4', 'E4', 'G4', 'A4'],
+      folk: ['D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C#5', 'D5'],
+      funk: ['C4', 'Eb4', 'F4', 'G4', 'Bb4', 'C5', 'Eb5', 'F5'],
+      reggae: ['A3', 'C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5'],
+      pop: ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'Bb4', 'C5']
+    };
+    const baseScale = scales[genre];
+    const notes = [];
+    const notesCount = Math.max(4, Math.floor(complexity * this.melodySettings.density));
+    if (this.coreNotes && this.coreNotes.length > 0) {
+      const filteredScale = baseScale.filter(note => this.coreNotes.some(coreNote => note.startsWith(coreNote)));
+      if (filteredScale.length > 0) {
+        baseScale = filteredScale;
+      }
+    }
+    let currentIndex = Math.floor(baseScale.length / 2);
+    let direction = 1;
+    for (let i = 0; i < notesCount; i++) {
+      switch (this.melodySettings.direction) {
+        case 'ascending':
+          direction = 1;
+          break;
+        case 'descending':
+          direction = -1;
+          break;
+        case 'wave':
+          if (i % 4 === 0) direction *= -1;
+          break;
+        default:
+          direction = Math.random() > 0.5 ? 1 : -1;
+      }
+      let step = Math.floor(Math.random() * 3) * direction;
+      currentIndex += step;
+      const maxRange = Math.floor(this.melodySettings.range / 2);
+      currentIndex = Math.max(0, Math.min(baseScale.length - 1, currentIndex));
+      notes.push(baseScale[currentIndex]);
+    }
+    if (this.voiceEnabled) {
+      const voiceNotes = notes.map(note => {
+        let harmonyNote;
+        switch (this.voiceSettings.harmonization) {
+          case 'third':
+            harmonyNote = Tone.Frequency(note).transpose(4);
+            break;
+          case 'fifth':
+            harmonyNote = Tone.Frequency(note).transpose(7);
+            break;
+          case 'octave':
+            harmonyNote = Tone.Frequency(note).transpose(12);
+            break;
+          default:
+            harmonyNote = Tone.Frequency(note);
+        }
+        return harmonyNote.toNote();
+      });
+      return [...notes, ...voiceNotes];
+    }
+    return notes;
+  }
+  togglePlay() {
+    if (!this.isPlaying) {
+      Tone.start();
+      Tone.Transport.start();
+      this.instruments.forEach(inst => inst.pattern.start(0));
+      this.startRecording();
+      if (this.drumEnabled && this.drumPattern) {
+        this.drumPattern.start(0);
+      }
+    } else {
+      this.instruments.forEach(inst => inst.pattern.stop());
+      Tone.Transport.stop();
+      this.stopRecording();
+      if (this.drumPattern) {
+        this.drumPattern.stop();
+      }
+    }
+    this.isPlaying = !this.isPlaying;
+    document.getElementById('playBtn').textContent = this.isPlaying ? 'Pause' : 'Play';
+  }
+  stop() {
+    if (this.isPlaying) {
+      this.instruments.forEach(inst => inst.pattern.stop());
+      Tone.Transport.stop();
+      this.stopRecording();
+      if (this.drumPattern) {
+        this.drumPattern.stop();
+      }
+      this.isPlaying = false;
+      document.getElementById('playBtn').textContent = 'Play';
+    }
+  }
+  updateVisualizer() {
+    const bars = document.querySelectorAll('.bar');
+    bars.forEach(bar => {
+      const height = Math.random() * 100;
+      bar.style.height = `${height}%`;
+    });
+  }
+  startRecording() {
+    const dest = Tone.context.createMediaStreamDestination();
+    this.instruments.forEach(inst => {
+      if (inst.effects) {
+        Object.values(inst.effects).forEach(effect => effect.connect(dest));
+      }
+      inst.synth.connect(dest);
+    });
+    this.recorder = new MediaRecorder(dest.stream);
+    this.recorder.ondataavailable = evt => {
+      this.chunks.push(evt.data);
+    };
+    this.recorder.start();
+  }
+  stopRecording() {
+    if (this.recorder && this.recorder.state === 'recording') {
+      this.recorder.stop();
+      this.recorder.onstop = () => {
+        const blob = new Blob(this.chunks, {
+          type: 'audio/webm'
+        });
+        this.chunks = [];
+        this.audioBlob = blob;
+      };
+    }
+  }
+  export() {
+    if (this.audioBlob) {
+      const url = URL.createObjectURL(this.audioBlob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'ai-generated-music.webm';
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }
+  }
+}
+const generator = new MusicGenerator();</script>
+</body></html>
